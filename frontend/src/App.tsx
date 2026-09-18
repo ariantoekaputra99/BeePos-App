@@ -1,180 +1,25 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
-const stats = [
-  { label: 'Penjualan hari ini', value: 'Rp 14.250.000', tone: 'emerald' },
-  { label: 'Transaksi', value: '268', tone: 'sky' },
-  { label: 'Produk aktif', value: '1.240', tone: 'violet' },
-  { label: 'Laba bersih', value: 'Rp 3.820.000', tone: 'amber' },
+type Product = { id: number; name: string; sku: string; price: number; stock: number; category: string };
+type CartItem = Product & { quantity: number };
+const initialProducts: Product[] = [
+  { id: 1, name: 'Beras Premium 5kg', sku: 'BR-005', price: 72000, stock: 24, category: 'Sembako' },
+  { id: 2, name: 'Minyak Goreng 2L', sku: 'MG-002', price: 34000, stock: 16, category: 'Sembako' },
+  { id: 3, name: 'Coca Cola 1L', sku: 'CC-001', price: 18000, stock: 42, category: 'Minuman' },
+  { id: 4, name: 'Ayam Potong', sku: 'AY-001', price: 120000, stock: 8, category: 'Segar' },
+  { id: 5, name: 'Telur Ayam 1kg', sku: 'TL-001', price: 29000, stock: 5, category: 'Segar' },
 ];
-
-const recentSales = [
-  { id: '#1024', customer: 'Andi', item: 'Minyak Goreng 2L', total: 'Rp 34.000', time: '09:15' },
-  { id: '#1025', customer: 'Rina', item: 'Beras 5kg', total: 'Rp 72.000', time: '09:28' },
-  { id: '#1026', customer: 'Budi', item: 'Ayam Potong', total: 'Rp 120.000', time: '10:05' },
-  { id: '#1027', customer: 'Dewi', item: 'Coca Cola 1L', total: 'Rp 18.000', time: '10:40' },
-];
-
-const topProducts = [
-  { name: 'Beras 5kg', sold: 96 },
-  { name: 'Minyak Goreng', sold: 78 },
-  { name: 'Coca Cola 1L', sold: 64 },
-  { name: 'Ayam Potong', sold: 52 },
-];
-
-const lowStock = [
-  { name: 'Telur Ayam', stock: 8 },
-  { name: 'Susu UHT', stock: 12 },
-  { name: 'Sabun Cuci', stock: 5 },
-];
-
-const quickActions = ['Transaksi Baru', 'Tambah Produk', 'Laporan Harian', 'Kelola Pelanggan'];
+const rupiah = (n: number) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n);
 
 export default function App() {
-  const [selectedTab, setSelectedTab] = useState('overview');
-
-  const activeView = useMemo(() => {
-    if (selectedTab === 'pos') return 'POS Terminal';
-    if (selectedTab === 'products') return 'Product Management';
-    if (selectedTab === 'reports') return 'Reports';
-    return 'Overview Dashboard';
-  }, [selectedTab]);
-
-  return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
-      <div className="mx-auto max-w-7xl px-6 py-8">
-        <header className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.3em] text-amber-400">BeePos</p>
-            <h1 className="mt-2 text-3xl font-bold text-white">Point of Sale Dashboard</h1>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            {quickActions.map((action) => (
-              <button
-                key={action}
-                className="rounded-xl border border-slate-700 bg-slate-900 px-3 py-2 text-sm font-medium text-slate-200 transition hover:border-amber-400 hover:text-amber-300"
-              >
-                {action}
-              </button>
-            ))}
-          </div>
-        </header>
-
-        <nav className="mb-6 flex flex-wrap gap-2 rounded-2xl border border-slate-800 bg-slate-900 p-2">
-          {[
-            { key: 'overview', label: 'Overview' },
-            { key: 'pos', label: 'POS' },
-            { key: 'products', label: 'Products' },
-            { key: 'reports', label: 'Reports' },
-          ].map((tab) => (
-            <button
-              key={tab.key}
-              onClick={() => setSelectedTab(tab.key)}
-              className={`rounded-xl px-4 py-2 text-sm font-medium transition ${
-                selectedTab === tab.key
-                  ? 'bg-amber-400 text-slate-950'
-                  : 'text-slate-300 hover:bg-slate-800'
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </nav>
-
-        <div className="mb-6 rounded-2xl border border-slate-800 bg-slate-900 p-4">
-          <p className="text-sm text-slate-400">Current view</p>
-          <h2 className="mt-1 text-xl font-semibold text-white">{activeView}</h2>
-        </div>
-
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {stats.map((stat) => (
-            <div key={stat.label} className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg shadow-slate-950/30">
-              <div className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${
-                stat.tone === 'emerald'
-                  ? 'bg-emerald-500/10 text-emerald-400'
-                  : stat.tone === 'sky'
-                    ? 'bg-sky-500/10 text-sky-400'
-                    : stat.tone === 'violet'
-                      ? 'bg-violet-500/10 text-violet-400'
-                      : 'bg-amber-500/10 text-amber-400'
-              }`}>
-                {stat.label}
-              </div>
-              <p className="mt-4 text-2xl font-bold text-white">{stat.value}</p>
-            </div>
-          ))}
-        </section>
-
-        <section className="mt-8 grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-            <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-white">Penjualan terbaru</h2>
-              <span className="text-sm text-slate-400">30 menit terakhir</span>
-            </div>
-
-            <div className="overflow-hidden rounded-xl border border-slate-800">
-              <table className="min-w-full text-left text-sm">
-                <thead className="bg-slate-950/60 text-slate-300">
-                  <tr>
-                    <th className="px-4 py-3 font-medium">Invoice</th>
-                    <th className="px-4 py-3 font-medium">Customer</th>
-                    <th className="px-4 py-3 font-medium">Item</th>
-                    <th className="px-4 py-3 font-medium">Total</th>
-                    <th className="px-4 py-3 font-medium">Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {recentSales.map((sale) => (
-                    <tr key={sale.id} className="border-t border-slate-800 bg-slate-900/40">
-                      <td className="px-4 py-3 text-slate-300">{sale.id}</td>
-                      <td className="px-4 py-3 text-slate-200">{sale.customer}</td>
-                      <td className="px-4 py-3 text-slate-300">{sale.item}</td>
-                      <td className="px-4 py-3 font-semibold text-emerald-400">{sale.total}</td>
-                      <td className="px-4 py-3 text-slate-400">{sale.time}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-              <h2 className="mb-5 text-xl font-semibold text-white">Produk terlaris</h2>
-              <div className="space-y-4">
-                {topProducts.map((product) => (
-                  <div key={product.name}>
-                    <div className="mb-1 flex items-center justify-between text-sm text-slate-300">
-                      <span>{product.name}</span>
-                      <span>{product.sold} pcs</span>
-                    </div>
-                    <div className="h-2.5 rounded-full bg-slate-800">
-                      <div
-                        className="h-2.5 rounded-full bg-gradient-to-r from-amber-400 via-orange-400 to-emerald-400"
-                        style={{ width: `${(product.sold / 100) * 100}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
-              <h2 className="mb-5 text-xl font-semibold text-white">Stok menipis</h2>
-              <div className="space-y-3">
-                {lowStock.map((item) => (
-                  <div key={item.name} className="flex items-center justify-between rounded-xl bg-slate-950/50 px-3 py-2">
-                    <span className="text-slate-200">{item.name}</span>
-                    <span className="rounded-full bg-rose-500/10 px-2 py-1 text-xs font-medium text-rose-300">
-                      {item.stock} pcs
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-      </div>
-    </div>
-  );
+  const [products, setProducts] = useState(initialProducts);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [query, setQuery] = useState('');
+  const [active, setActive] = useState('POS');
+  const [message, setMessage] = useState('');
+  const filtered = products.filter(p => `${p.name} ${p.sku} ${p.category}`.toLowerCase().includes(query.toLowerCase()));
+  const total = useMemo(() => cart.reduce((sum, item) => sum + item.price * item.quantity, 0), [cart]);
+  const add = (product: Product) => setCart(current => { const found = current.find(i => i.id === product.id); if (found) return current.map(i => i.id === product.id ? { ...i, quantity: Math.min(i.quantity + 1, product.stock) } : i); return [...current, { ...product, quantity: 1 }]; });
+  const checkout = () => { if (!cart.length) return; setProducts(current => current.map(p => { const item = cart.find(i => i.id === p.id); return item ? { ...p, stock: p.stock - item.quantity } : p; })); setCart([]); setMessage(`Transaksi berhasil disimpan — ${rupiah(total)}`); setTimeout(() => setMessage(''), 3500); };
+  return <div className="min-h-screen bg-slate-950 text-slate-100"><aside className="fixed hidden h-screen w-64 border-r border-slate-800 bg-slate-900 p-6 md:block"><div className="mb-10"><p className="text-xs uppercase tracking-[.3em] text-amber-400">BeePos</p><h1 className="mt-2 text-2xl font-bold">Retail OS</h1></div><nav className="space-y-2">{['Dashboard','POS','Produk','Inventori','Laporan'].map(item => <button key={item} onClick={() => setActive(item)} className={`block w-full rounded-xl px-4 py-3 text-left text-sm ${active === item ? 'bg-amber-400 font-semibold text-slate-950' : 'text-slate-300 hover:bg-slate-800'}`}>{item}</button>)}</nav><div className="absolute bottom-6 left-6 right-6 rounded-xl border border-slate-700 bg-slate-950 p-3 text-sm"><p className="text-slate-400">Signed in as</p><p className="font-semibold">Admin</p></div></aside><main className="min-h-screen md:ml-64"><header className="flex items-center justify-between border-b border-slate-800 bg-slate-950/80 px-6 py-5 backdrop-blur"><div><p className="text-sm text-slate-400">Good morning, Admin</p><h2 className="text-2xl font-bold">{active}</h2></div><div className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs text-emerald-400">● System online</div></header>{message && <div className="mx-6 mt-5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-emerald-300">{message}</div>}<div className="grid gap-6 p-6 xl:grid-cols-[1fr_380px]"><section><div className="mb-5 grid gap-4 sm:grid-cols-3"><div className="rounded-2xl border border-slate-800 bg-slate-900 p-4"><p className="text-sm text-slate-400">Penjualan hari ini</p><p className="mt-2 text-xl font-bold">Rp 14.250.000</p></div><div className="rounded-2xl border border-slate-800 bg-slate-900 p-4"><p className="text-sm text-slate-400">Transaksi</p><p className="mt-2 text-xl font-bold">268</p></div><div className="rounded-2xl border border-slate-800 bg-slate-900 p-4"><p className="text-sm text-slate-400">Stok menipis</p><p className="mt-2 text-xl font-bold text-rose-300">{products.filter(p => p.stock < 10).length}</p></div></div><div className="mb-4 flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h3 className="text-xl font-semibold">Pilih produk</h3><p className="text-sm text-slate-400">Klik produk untuk menambahkan ke keranjang</p></div><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Cari produk atau SKU..." className="rounded-xl border border-slate-700 bg-slate-900 px-4 py-2 text-sm outline-none ring-amber-400 focus:ring-2" /></div><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{filtered.map(product => <button key={product.id} disabled={!product.stock} onClick={() => add(product)} className="rounded-2xl border border-slate-800 bg-slate-900 p-4 text-left transition hover:-translate-y-0.5 hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-50"><div className="mb-6 flex items-start justify-between"><span className="rounded-full bg-slate-800 px-2 py-1 text-xs text-slate-300">{product.category}</span><span className={`text-xs ${product.stock < 10 ? 'text-rose-300' : 'text-slate-400'}`}>{product.stock} stok</span></div><p className="font-semibold">{product.name}</p><p className="mt-1 text-xs text-slate-500">{product.sku}</p><p className="mt-4 font-bold text-amber-300">{rupiah(product.price)}</p></button>)}</div></section><aside className="h-fit rounded-2xl border border-slate-800 bg-slate-900 p-5 xl:sticky xl:top-5"><div className="mb-5 flex items-center justify-between"><div><h3 className="text-xl font-semibold">Keranjang</h3><p className="text-sm text-slate-400">{cart.length} jenis produk</p></div><button onClick={() => setCart([])} className="text-xs text-rose-300 hover:text-rose-200">Kosongkan</button></div><div className="min-h-48 space-y-3">{cart.length === 0 ? <div className="flex h-48 items-center justify-center rounded-xl border border-dashed border-slate-700 text-sm text-slate-500">Keranjang masih kosong</div> : cart.map(item => <div key={item.id} className="rounded-xl bg-slate-950/60 p-3"><div className="flex justify-between gap-3"><p className="text-sm font-medium">{item.name}</p><p className="text-sm font-semibold text-amber-300">{rupiah(item.price * item.quantity)}</p></div><div className="mt-2 flex items-center justify-between text-xs text-slate-400"><span>{rupiah(item.price)} × {item.quantity}</span><div className="flex gap-2"><button onClick={() => setCart(c => c.map(i => i.id === item.id ? { ...i, quantity: Math.max(0, i.quantity - 1) } : i).filter(i => i.quantity > 0))} className="rounded bg-slate-800 px-2">−</button><button onClick={() => add(item)} className="rounded bg-slate-800 px-2">+</button></div></div></div>)}</div><div className="mt-5 border-t border-slate-800 pt-4"><div className="flex justify-between text-sm text-slate-400"><span>Subtotal</span><span>{rupiah(total)}</span></div><div className="mt-2 flex justify-between text-lg font-bold"><span>Total</span><span className="text-amber-300">{rupiah(total)}</span></div><button onClick={checkout} disabled={!cart.length} className="mt-5 w-full rounded-xl bg-amber-400 py-3 font-bold text-slate-950 transition hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-40">Bayar sekarang</button></div></aside></div></main></div>;
 }

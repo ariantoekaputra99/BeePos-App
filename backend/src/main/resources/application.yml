@@ -1,12 +1,17 @@
-package com.bee.pos;
-
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-
-@SpringBootApplication
-public class BeePosApplication {
-
-    public static void main(String[] args) {
-        SpringApplication.run(BeePosApplication.class, args);
-    }
-}
+server:
+  port: ${SERVER_PORT:8080}
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/bee_pos}
+    username: ${SPRING_DATASOURCE_USERNAME:beeuser}
+    password: ${SPRING_DATASOURCE_PASSWORD:bee123}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+  flyway:
+    enabled: false
+app:
+  jwt:
+    secret: ${JWT_SECRET:bee-pos-development-secret-key-must-be-at-least-32-bytes}
+    expiration-ms: ${JWT_EXPIRATION_MS:86400000}
