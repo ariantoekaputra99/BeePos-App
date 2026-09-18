@@ -1,0 +1,95 @@
+const stats = [
+  { label: 'Penjualan Hari Ini', value: 'Rp 14.250.000', tone: 'bg-emerald-500/10 text-emerald-400' },
+  { label: 'Transaksi', value: '268', tone: 'bg-sky-500/10 text-sky-400' },
+  { label: 'Produk', value: '1.240', tone: 'bg-violet-500/10 text-violet-400' },
+  { label: 'Laba Bersih', value: 'Rp 3.820.000', tone: 'bg-amber-500/10 text-amber-400' },
+];
+
+const recentSales = [
+  { customer: 'Andi', item: 'Coca Cola 1L', total: 'Rp 18.000', time: '09:15' },
+  { customer: 'Rina', item: 'Beras 5kg', total: 'Rp 72.000', time: '09:42' },
+  { customer: 'Dewi', item: 'Ayam Potong', total: 'Rp 120.000', time: '10:05' },
+  { customer: 'Budi', item: 'Minyak Goreng', total: 'Rp 28.500', time: '10:40' },
+];
+
+const topProducts = [
+  { name: 'Beras 5kg', sold: 96 },
+  { name: 'Minyak Goreng', sold: 78 },
+  { name: 'Coca Cola 1L', sold: 64 },
+  { name: 'Ayam Potong', sold: 52 },
+];
+
+export default function App() {
+  return (
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="mx-auto max-w-7xl px-6 py-10">
+        <header className="mb-8 flex items-center justify-between">
+          <div>
+            <p className="text-sm uppercase tracking-[0.2em] text-amber-400">BeePos</p>
+            <h1 className="mt-2 text-3xl font-bold">Dashboard POS</h1>
+          </div>
+
+          <button className="rounded-xl bg-amber-500 px-4 py-2 font-semibold text-slate-950 transition hover:bg-amber-400">
+            + Transaksi Baru
+          </button>
+        </header>
+
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {stats.map((stat) => (
+            <div key={stat.label} className="rounded-2xl border border-slate-800 bg-slate-900 p-5 shadow-lg shadow-slate-950/30">
+              <div className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${stat.tone}`}>
+                {stat.label}
+              </div>
+              <p className="mt-4 text-2xl font-bold text-white">{stat.value}</p>
+            </div>
+          ))}
+        </section>
+
+        <section className="mt-8 grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+            <div className="mb-6 flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Penjualan Terbaru</h2>
+              <span className="text-sm text-slate-400">30 menit terakhir</span>
+            </div>
+
+            <div className="space-y-4">
+              {recentSales.map((sale) => (
+                <div key={`${sale.customer}-${sale.time}`} className="flex items-center justify-between rounded-xl border border-slate-800 bg-slate-950/50 p-3">
+                  <div>
+                    <p className="font-medium text-white">{sale.customer}</p>
+                    <p className="text-sm text-slate-400">{sale.item}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-emerald-400">{sale.total}</p>
+                    <p className="text-xs text-slate-500">{sale.time}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6">
+            <h2 className="mb-6 text-xl font-semibold">Produk Terlaris</h2>
+
+            <div className="space-y-4">
+              {topProducts.map((product) => (
+                <div key={product.name}>
+                  <div className="mb-1 flex items-center justify-between text-sm text-slate-300">
+                    <span>{product.name}</span>
+                    <span>{product.sold} pcs</span>
+                  </div>
+                  <div className="h-2.5 rounded-full bg-slate-800">
+                    <div
+                      className="h-2.5 rounded-full bg-gradient-to-r from-amber-400 to-emerald-400"
+                      style={{ width: `${(product.sold / 100) * 100}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
