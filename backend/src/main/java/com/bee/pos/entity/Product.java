@@ -1,31 +1,29 @@
-package com.bee.pos.controller;
+package com.bee.pos.entity;
 
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import jakarta.persistence.*;
+import lombok.*;
 
-import java.util.Map;
+@Entity
+@Table(name = "products")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class Product {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-@RestController
-@RequestMapping("/api/auth")
-public class AuthController {
+    @Column(nullable = false)
+    private String name;
 
-    @PostMapping("/login")
-    public Map<String, String> login() {
-        return Map.of(
-            "message", "Login successful",
-            "token", "demo-token"
-        );
-    }
+    @Column(nullable = false, unique = true)
+    private String sku;
 
-    @GetMapping("/me")
-    public Map<String, Object> me() {
-        return Map.of(
-            "id", 1,
-            "name", "Admin BeePos",
-            "role", "ADMIN",
-            "email", "admin@bee-pos.local"
-        );
-    }
+    @Column(nullable = false)
+    private Double price;
+
+    @Column(nullable = false)
+    private Integer stock;
+
+    private String category;
+
+    @Column(length = 1000)
+    private String description;
 }
