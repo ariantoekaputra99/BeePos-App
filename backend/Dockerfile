@@ -1,11 +1,20 @@
-FROM eclipse-temurin:21-jdk
-
+# ---- build ----
+FROM eclipse-temurin:21-jdk AS build
 WORKDIR /app
+COPY mvnw pom.xml ./
+COPY .mvn .mvn
+RUN chmod +x mvnw && ./mvnw -B -q dependency:go-offline
+COPY src src
+RUN ./mvnw -B -q package -DskipTests
 
-COPY . .
-
-RUN ./mvnw clean package -DskipTests
-
+# ---- run ----
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --uid 10001 beepos
+COPY --from=build /app/target/bee-pos-backend-0.0.1-SNAPSHOT.jar app.jar
+USER beepos
 EXPOSE 8080
-
-ENTRYPOINT ["java","-jar","target/bee-pos-backend-0.0.1-SNAPSHOT.jar"]
+HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=5 \
+  CMD curl -fsS http://localhost:8080/actuator/health || exit 1
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "app.jar"]

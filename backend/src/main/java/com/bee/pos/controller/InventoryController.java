@@ -1,8 +1,11 @@
 package com.bee.pos.controller;
 
-import com.bee.pos.entity.InventoryMovement;
+import com.bee.pos.dto.InventoryDtos.MovementResponse;
+import com.bee.pos.dto.InventoryDtos.StockRequest;
 import com.bee.pos.service.InventoryService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -10,19 +13,27 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/inventory")
 @RequiredArgsConstructor
+@PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
 public class InventoryController {
-    private final InventoryService inventoryService;
+    private final InventoryService inventory;
 
     @GetMapping
-    public List<InventoryMovement> getAll() { return inventoryService.findAll(); }
+    public List<MovementResponse> list(@RequestParam(required = false) Long productId) {
+        return inventory.findAll(productId);
+    }
 
     @PostMapping("/in")
-    public void addStock(@RequestParam Long productId, @RequestParam Integer quantity, @RequestParam(defaultValue = "Stock in") String note) {
-        inventoryService.addStock(productId, quantity, note);
+    public MovementResponse stockIn(@Valid @RequestBody StockRequest request) {
+        return inventory.stockIn(request);
     }
 
     @PostMapping("/out")
-    public void reduceStock(@RequestParam Long productId, @RequestParam Integer quantity, @RequestParam(defaultValue = "Stock out") String note) {
-        inventoryService.reduceStock(productId, quantity, note);
+    public MovementResponse stockOut(@Valid @RequestBody StockRequest request) {
+        return inventory.stockOut(request);
+    }
+
+    @PostMapping("/adjust")
+    public MovementResponse adjust(@Valid @RequestBody StockRequest request) {
+        return inventory.adjust(request);
     }
 }

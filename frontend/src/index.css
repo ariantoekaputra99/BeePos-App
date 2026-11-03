@@ -52,3 +52,12 @@ button {
 ::-webkit-scrollbar-thumb:hover {
   background: #475569;
 }
+
+/* Print only the receipt when window.print() is called from the receipt modal. */
+@media print {
+  @page { size: 80mm auto; margin: 4mm; }
+  body { background: #fff !important; }
+  body * { visibility: hidden; }
+  .print-area, .print-area * { visibility: visible; }
+  .print-area { position: absolute; left: 0; top: 0; width: 100%; }
+}

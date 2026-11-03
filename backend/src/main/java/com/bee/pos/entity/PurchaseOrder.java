@@ -38,6 +38,10 @@ public class PurchaseOrder {
 
     private String note;
 
+    private OffsetDateTime receivedAt;
+
+    private String createdBy;
+
     @OneToMany(mappedBy = "purchaseOrder", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<PurchaseOrderItem> items = new ArrayList<>();

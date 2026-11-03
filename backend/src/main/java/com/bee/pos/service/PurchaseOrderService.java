@@ -1,90 +1,107 @@
 package com.bee.pos.service;
 
-import com.bee.pos.dto.PurchaseOrderRequest;
+import com.bee.pos.dto.PurchaseDtos.PurchaseOrderRequest;
+import com.bee.pos.dto.PurchaseDtos.PurchaseOrderResponse;
 import com.bee.pos.entity.*;
-import com.bee.pos.repository.*;
+import com.bee.pos.exception.BusinessException;
+import com.bee.pos.exception.NotFoundException;
+import com.bee.pos.repository.ProductRepository;
+import com.bee.pos.repository.PurchaseOrderRepository;
+import com.bee.pos.repository.SupplierRepository;
+import com.bee.pos.security.CurrentUser;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 @RequiredArgsConstructor
 public class PurchaseOrderService {
+    private static final DateTimeFormatter NUMBER_FORMAT = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
+
     private final PurchaseOrderRepository purchaseOrders;
     private final SupplierRepository suppliers;
     private final ProductRepository products;
-    private final InventoryService inventoryService;
+    private final InventoryService inventory;
+    private final ZoneId businessZone;
+
+    @Transactional(readOnly = true)
+    public List<PurchaseOrderResponse> findAll() {
+        return purchaseOrders.findAllByOrderByCreatedAtDesc().stream().map(PurchaseOrderResponse::from).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public PurchaseOrderResponse get(Long id) {
+        return PurchaseOrderResponse.from(find(id));
+    }
 
     @Transactional
-    public PurchaseOrder create(PurchaseOrderRequest request) {
+    public PurchaseOrderResponse create(PurchaseOrderRequest request) {
         Supplier supplier = suppliers.findById(request.supplierId())
-            .orElseThrow(() -> new IllegalArgumentException("Supplier not found: " + request.supplierId()));
-
-        if (request.items() == null || request.items().isEmpty()) {
-            throw new IllegalArgumentException("Purchase order must contain at least one item");
-        }
+            .orElseThrow(() -> NotFoundException.of("Supplier", request.supplierId()));
+        OffsetDateTime now = OffsetDateTime.now(businessZone);
 
         PurchaseOrder order = PurchaseOrder.builder()
             .supplier(supplier)
-            .orderNumber("PO-" + System.currentTimeMillis())
-            .createdAt(OffsetDateTime.now())
+            .orderNumber("PO-" + now.format(NUMBER_FORMAT) + "-" + ThreadLocalRandom.current().nextInt(100, 1000))
+            .createdAt(now)
+            .createdBy(CurrentUser.username())
             .status(PurchaseOrderStatus.PENDING)
-            .note(request.note())
-            .subtotal(BigDecimal.ZERO)
-            .total(BigDecimal.ZERO)
+            .note(request.note() == null || request.note().isBlank() ? null : request.note().trim())
             .build();
 
         BigDecimal subtotal = BigDecimal.ZERO;
-
-        for (PurchaseOrderRequest.Item itemRequest : request.items()) {
-            Product product = products.findById(itemRequest.productId())
-                .orElseThrow(() -> new IllegalArgumentException("Product not found: " + itemRequest.productId()));
-
-            if (itemRequest.quantity() == null || itemRequest.quantity() <= 0) {
-                throw new IllegalArgumentException("Quantity must be greater than zero for product " + product.getName());
-            }
-
-            BigDecimal unitPrice = BigDecimal.valueOf(itemRequest.unitPrice());
-            BigDecimal lineTotal = unitPrice.multiply(BigDecimal.valueOf(itemRequest.quantity()));
-
-            PurchaseOrderItem item = PurchaseOrderItem.builder()
+        for (PurchaseOrderRequest.Item line : request.items()) {
+            Product product = products.findById(line.productId())
+                .orElseThrow(() -> NotFoundException.of("Produk", line.productId()));
+            BigDecimal lineTotal = line.unitPrice().multiply(BigDecimal.valueOf(line.quantity()));
+            order.addItem(PurchaseOrderItem.builder()
                 .product(product)
-                .quantity(itemRequest.quantity())
-                .unitPrice(unitPrice)
+                .quantity(line.quantity())
+                .unitPrice(line.unitPrice())
                 .lineTotal(lineTotal)
-                .build();
-
-            order.addItem(item);
+                .build());
             subtotal = subtotal.add(lineTotal);
         }
-
         order.setSubtotal(subtotal);
         order.setTotal(subtotal);
-        return purchaseOrders.save(order);
+        return PurchaseOrderResponse.from(purchaseOrders.save(order));
+    }
+
+    /** Receiving adds the goods to stock and updates each product's cost price to the latest purchase price. */
+    @Transactional
+    public PurchaseOrderResponse receive(Long id) {
+        PurchaseOrder order = find(id);
+        if (order.getStatus() != PurchaseOrderStatus.PENDING) {
+            throw new BusinessException("Hanya PO berstatus PENDING yang bisa diterima");
+        }
+        for (PurchaseOrderItem item : order.getItems()) {
+            Product product = inventory.lock(item.getProduct().getId());
+            product.setCostPrice(item.getUnitPrice());
+            inventory.record(product, "PURCHASE", item.getQuantity(), "Penerimaan " + order.getOrderNumber());
+        }
+        order.setStatus(PurchaseOrderStatus.RECEIVED);
+        order.setReceivedAt(OffsetDateTime.now(businessZone));
+        return PurchaseOrderResponse.from(purchaseOrders.save(order));
     }
 
     @Transactional
-    public PurchaseOrder receive(Long purchaseOrderId) {
-        PurchaseOrder order = purchaseOrders.findById(purchaseOrderId)
-            .orElseThrow(() -> new IllegalArgumentException("Purchase order not found: " + purchaseOrderId));
-
-        if (order.getStatus() == PurchaseOrderStatus.CANCELLED) {
-            throw new IllegalArgumentException("Cannot receive cancelled purchase order");
+    public PurchaseOrderResponse cancel(Long id) {
+        PurchaseOrder order = find(id);
+        if (order.getStatus() != PurchaseOrderStatus.PENDING) {
+            throw new BusinessException("Hanya PO berstatus PENDING yang bisa dibatalkan");
         }
-
-        for (PurchaseOrderItem item : order.getItems()) {
-            inventoryService.addStock(item.getProduct().getId(), item.getQuantity(), "Purchase order " + order.getOrderNumber());
-        }
-
-        order.setStatus(PurchaseOrderStatus.RECEIVED);
-        return purchaseOrders.save(order);
+        order.setStatus(PurchaseOrderStatus.CANCELLED);
+        return PurchaseOrderResponse.from(purchaseOrders.save(order));
     }
 
-    public List<PurchaseOrder> findAll() {
-        return purchaseOrders.findAll();
+    private PurchaseOrder find(Long id) {
+        return purchaseOrders.findById(id).orElseThrow(() -> NotFoundException.of("Purchase order", id));
     }
 }
