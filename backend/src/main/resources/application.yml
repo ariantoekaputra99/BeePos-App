@@ -1,17 +1,41 @@
 server:
   port: ${SERVER_PORT:8080}
+  shutdown: graceful
+
 spring:
+  application:
+    name: bee-pos-backend
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/bee_pos}
     username: ${SPRING_DATASOURCE_USERNAME:beeuser}
     password: ${SPRING_DATASOURCE_PASSWORD:bee123}
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: ${SPRING_JPA_DDL_AUTO:update}
     open-in-view: false
   flyway:
     enabled: false
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
 app:
+  timezone: ${APP_TIMEZONE:Asia/Jakarta}
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:4173,http://localhost:8081}
+  seed:
+    admin-password: ${APP_ADMIN_PASSWORD:admin123}
+    demo-data: ${APP_SEED_DEMO:true}
   jwt:
     secret: ${JWT_SECRET:bee-pos-development-secret-key-must-be-at-least-32-bytes}
     expiration-ms: ${JWT_EXPIRATION_MS:86400000}

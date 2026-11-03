@@ -1,37 +1,36 @@
-package com.bee.pos.entity;
+package com.bee.pos.repository;
 
-import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import com.bee.pos.entity.Product;
+import jakarta.persistence.LockModeType;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
-@Entity
-@Table(name = "products")
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
-public class Product {
+import java.util.List;
+import java.util.Optional;
 
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+public interface ProductRepository extends JpaRepository<Product, Long> {
 
-    @Column(nullable = false)
-    private String name;
+    List<Product> findAllByOrderByNameAsc();
 
-    @Column(nullable = false)
-    private String sku;
+    @Query("select p from Product p where (p.active = true or p.active is null) and p.stock <= coalesce(p.minStock, 5) order by p.stock")
+    List<Product> findLowStock();
 
-    @Column(nullable = false)
-    private Double price;
+    @Query("select count(p) from Product p where p.active = true or p.active is null")
+    long countActive();
 
-    @Column(nullable = false)
-    private Integer stock;
+    Optional<Product> findBySkuIgnoreCase(String sku);
 
-    private String category;
+    Optional<Product> findByBarcode(String barcode);
 
-    @Column(length = 1000)
-    private String description;
+    boolean existsBySkuIgnoreCaseAndIdNot(String sku, Long id);
+
+    boolean existsBySkuIgnoreCase(String sku);
+
+    long countByCategory(String category);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Product p where p.id = :id")
+    Optional<Product> findByIdForUpdate(@Param("id") Long id);
 }

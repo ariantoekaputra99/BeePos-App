@@ -1,44 +1,56 @@
-package com.bee.pos.service;
+package com.bee.pos.controller;
 
 import com.bee.pos.entity.Product;
-import com.bee.pos.repository.ProductRepository;
+import com.bee.pos.service.ProductService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.stereotype.Service;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@Service
+@RestController
+@RequestMapping("/api/products")
 @RequiredArgsConstructor
-public class ProductService {
+public class ProductController {
+    private final ProductService products;
 
-    private final ProductRepository productRepository;
-
-    public List<Product> getAllProducts() {
-        return productRepository.findAll();
+    @GetMapping
+    public List<Product> list(@RequestParam(required = false) String q,
+                              @RequestParam(required = false) String category,
+                              @RequestParam(defaultValue = "false") boolean includeInactive,
+                              @RequestParam(defaultValue = "false") boolean lowStock) {
+        return products.search(q, category, includeInactive, lowStock);
     }
 
-    public Product createProduct(Product product) {
-        return productRepository.save(product);
+    @GetMapping("/{id}")
+    public Product get(@PathVariable Long id) {
+        return products.get(id);
     }
 
-    public Product getProductById(Long id) {
-        return productRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Product not found with id: " + id));
+    @GetMapping("/code/{code}")
+    public Product byCode(@PathVariable String code) {
+        return products.findByCode(code);
     }
 
-    public Product updateProduct(Long id, Product updatedProduct) {
-        Product existing = getProductById(id);
-        existing.setName(updatedProduct.getName());
-        existing.setSku(updatedProduct.getSku());
-        existing.setPrice(updatedProduct.getPrice());
-        existing.setStock(updatedProduct.getStock());
-        existing.setCategory(updatedProduct.getCategory());
-        existing.setDescription(updatedProduct.getDescription());
-        return productRepository.save(existing);
+    @PostMapping
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public ResponseEntity<Product> create(@Valid @RequestBody Product product) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(products.create(product));
     }
 
-    public void deleteProduct(Long id) {
-        Product product = getProductById(id);
-        productRepository.delete(product);
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public Product update(@PathVariable Long id, @Valid @RequestBody Product product) {
+        return products.update(id, product);
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        products.delete(id);
+        return ResponseEntity.noContent().build();
     }
 }
