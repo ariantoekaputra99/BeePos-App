@@ -2,16 +2,22 @@ import { Printer } from 'lucide-react';
 import type { Sale } from '../types/api';
 import { formatDateTime, money, num, paymentLabel } from '../lib/format';
 import { Badge, Button, Modal } from './ui';
+import { useStoreSettings } from '../lib/useStoreSettings';
+import { taxLabel } from '../lib/tax';
 
-const STORE_NAME = import.meta.env.VITE_STORE_NAME ?? 'BeePos Store';
-const STORE_ADDRESS = import.meta.env.VITE_STORE_ADDRESS ?? '';
+const FALLBACK_NAME = import.meta.env.VITE_STORE_NAME ?? 'BeePos Store';
 
 export function ReceiptBody({ sale }: { sale: Sale }) {
+  const store = useStoreSettings();
+  const name = store?.storeName || FALLBACK_NAME;
+  const footer = store?.receiptFooter ?? 'Terima kasih atas kunjungan Anda';
+  const hasTax = Number(sale.tax) > 0;
   return (
     <div className="receipt mx-auto max-w-xs bg-white p-4 font-mono text-[12px] leading-snug text-black">
       <div className="text-center">
-        <p className="text-sm font-bold">{STORE_NAME}</p>
-        {STORE_ADDRESS && <p>{STORE_ADDRESS}</p>}
+        <p className="text-sm font-bold">{name}</p>
+        {store?.address && <p>{store.address}</p>}
+        {store?.phone && <p>Telp. {store.phone}</p>}
         <p className="mt-1">{sale.invoiceNumber}</p>
         <p>{formatDateTime(sale.createdAt)}</p>
         <p>Kasir: {sale.cashier ?? '-'}{sale.customerName ? ` · ${sale.customerName}` : ''}</p>
@@ -30,12 +36,13 @@ export function ReceiptBody({ sale }: { sale: Sale }) {
       <hr className="my-2 border-dashed border-black" />
       <Row label="Subtotal" value={money(sale.subtotal)} />
       {Number(sale.discount) > 0 && <Row label="Diskon" value={`-${money(sale.discount)}`} />}
-      {Number(sale.tax) > 0 && <Row label="Pajak" value={money(sale.tax)} />}
+      {hasTax && !sale.taxInclusive && <Row label={taxLabel(sale.taxName, sale.taxRate)} value={money(sale.tax)} />}
       <Row label="TOTAL" value={money(sale.total)} bold />
+      {hasTax && sale.taxInclusive && <Row label={`Termasuk ${taxLabel(sale.taxName, sale.taxRate)}`} value={money(sale.tax)} />}
       <Row label={paymentLabel[sale.paymentMethod]} value={money(sale.amountPaid ?? sale.total)} />
       {Number(sale.changeAmount ?? 0) > 0 && <Row label="Kembali" value={money(sale.changeAmount)} />}
       <hr className="my-2 border-dashed border-black" />
-      <p className="text-center">Terima kasih atas kunjungan Anda</p>
+      {footer && <p className="whitespace-pre-line text-center">{footer}</p>}
     </div>
   );
 }

@@ -46,12 +46,16 @@ sudo ln -s /etc/nginx/sites-available/beepos /etc/nginx/sites-enabled/
 sudo certbot --nginx -d pos.example.com
 ```
 
-## 4. Backup database
+## 4. Backup database & gambar produk
 ```bash
 # backup harian (crontab -e)
 0 2 * * * docker exec bee_pos_db pg_dump -U beeuser bee_pos | gzip > /var/backups/beepos-$(date +\%F).sql.gz
 # restore
 gunzip -c beepos-2026-01-01.sql.gz | docker exec -i bee_pos_db psql -U beeuser bee_pos
+```
+Gambar produk disimpan di volume Docker `uploads_data`; backup juga:
+```bash
+docker run --rm -v beepos-app_uploads_data:/data -v /var/backups:/backup alpine tar czf /backup/beepos-uploads-$(date +%F).tgz -C /data .
 ```
 Uji restore secara berkala dan simpan salinan di luar VPS.
 

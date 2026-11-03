@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -53,7 +54,7 @@ class PosFlowIntegrationTest {
 
         JsonNode sale = body(call(post("/api/sales"), adminToken, Map.of(
             "items", new Object[]{Map.of("productId", productId, "quantity", 2), Map.of("productId", productId, "quantity", 1)},
-            "paymentMethod", "CASH", "tax", 0, "discount", 5000, "amountPaid", 50000))
+            "paymentMethod", "CASH", "discount", 5000, "amountPaid", 50000))
             .andExpect(status().isCreated()));
 
         assertThat(sale.get("subtotal").decimalValue()).isEqualByComparingTo("30000");
@@ -159,6 +160,89 @@ class PosFlowIntegrationTest {
         call(delete("/api/products/" + id), adminToken, null).andExpect(status().isNoContent());
         assertThat(body(call(get("/api/products"), adminToken, null))).isEmpty();
         assertThat(body(call(get("/api/products?includeInactive=true"), adminToken, null))).hasSize(1);
+    }
+
+    @Test
+    void storeTaxIsComputedOnServerAndExcludedFromProfit() throws Exception {
+        long taxed = createProduct("Snack", "SN-1", 10000, 6000, 10);
+        long exempt = createProduct("Beras", "BR-1", 20000, 15000, 10);
+        call(put("/api/products/" + exempt), adminToken, Map.of("name", "Beras", "sku", "BR-1", "price", 20000,
+            "costPrice", 15000, "stock", 10, "taxable", false)).andExpect(status().isOk())
+            .andExpect(jsonPath("$.taxable").value(false));
+
+        call(put("/api/settings"), adminToken, Map.of("storeName", "Toko Lebah", "taxEnabled", true,
+            "taxName", "PPN", "taxRate", 11, "taxInclusive", false)).andExpect(status().isOk());
+
+        // Client-sent "tax" is ignored; 11% of 10.000 (snack only) = 1.100
+        JsonNode sale = body(call(post("/api/sales"), adminToken, Map.of(
+            "items", new Object[]{Map.of("productId", taxed, "quantity", 1), Map.of("productId", exempt, "quantity", 1)},
+            "paymentMethod", "CASH", "tax", 999999, "amountPaid", 50000)).andExpect(status().isCreated()));
+        assertThat(sale.get("tax").decimalValue()).isEqualByComparingTo("1100");
+        assertThat(sale.get("total").decimalValue()).isEqualByComparingTo("31100");
+        assertThat(sale.get("taxName").asText()).isEqualTo("PPN");
+        assertThat(sale.get("taxInclusive").asBoolean()).isFalse();
+
+        JsonNode report = body(call(get("/api/reports/sales"), adminToken, null));
+        assertThat(report.get("totalTax").decimalValue()).isEqualByComparingTo("1100");
+        assertThat(report.get("netRevenue").decimalValue()).isEqualByComparingTo("30000");
+        assertThat(report.get("grossProfit").decimalValue()).isEqualByComparingTo("9000");
+
+        // Inclusive: total unchanged, tax extracted from price (11.100 -> 1.100 tax)
+        call(put("/api/settings"), adminToken, Map.of("storeName", "Toko Lebah", "taxEnabled", true,
+            "taxName", "PPN", "taxRate", 11, "taxInclusive", true)).andExpect(status().isOk());
+        long incl = createProduct("Kopi", "KP-1", 11100, 5000, 5);
+        JsonNode sale2 = body(call(post("/api/sales"), adminToken, Map.of(
+            "items", new Object[]{Map.of("productId", incl, "quantity", 1)}, "paymentMethod", "QRIS"))
+            .andExpect(status().isCreated()));
+        assertThat(sale2.get("total").decimalValue()).isEqualByComparingTo("11100");
+        assertThat(sale2.get("tax").decimalValue()).isEqualByComparingTo("1100");
+    }
+
+    @Test
+    void onlyAdminCanChangeSettingsButEveryoneCanRead() throws Exception {
+        call(post("/api/users"), adminToken, Map.of("username", "mgr", "email", "m@x.com",
+            "role", "MANAGER", "password", "rahasia1")).andExpect(status().isCreated());
+        String manager = token("mgr", "rahasia1");
+        call(get("/api/settings"), manager, null).andExpect(status().isOk())
+            .andExpect(jsonPath("$.taxName").value("PPN")).andExpect(jsonPath("$.taxEnabled").value(false));
+        call(put("/api/settings"), manager, Map.of("storeName", "X", "taxEnabled", true, "taxName", "PPN",
+            "taxRate", 11, "taxInclusive", false)).andExpect(status().isForbidden());
+        call(put("/api/settings"), adminToken, Map.of("storeName", "X", "taxEnabled", true, "taxName", "PPN",
+            "taxRate", 150, "taxInclusive", false)).andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void productImageUploadValidatesContentAndIsPubliclyReadable() throws Exception {
+        long id = createProduct("Teh", "TH-IMG", 3000, 2000, 1);
+        byte[] png = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n', 0, 0, 0, 13, 'I', 'H', 'D', 'R'};
+
+        mvc.perform(multipart("/api/products/" + id + "/image")
+                .file(new MockMultipartFile("file", "evil.png", "image/png", "<script>alert(1)</script>".getBytes()))
+                .header("Authorization", "Bearer " + adminToken))
+            .andExpect(status().isBadRequest());
+
+        JsonNode product = body(mvc.perform(multipart("/api/products/" + id + "/image")
+                .file(new MockMultipartFile("file", "../../etc/passwd", "text/plain", png))
+                .header("Authorization", "Bearer " + adminToken))
+            .andExpect(status().isOk()));
+        String url = product.get("imageUrl").asText();
+        assertThat(url).startsWith("/products/" + id + "/image?v=");
+        assertThat(product.has("imageFile")).isFalse();
+
+        mvc.perform(get("/api" + url)).andExpect(status().isOk())
+            .andExpect(content().contentType("image/png"))
+            .andExpect(content().bytes(png));
+
+        call(post("/api/users"), adminToken, Map.of("username", "ksr", "email", "ks@x.com",
+            "role", "CASHIER", "password", "rahasia1")).andExpect(status().isCreated());
+        mvc.perform(multipart("/api/products/" + id + "/image")
+                .file(new MockMultipartFile("file", "a.png", "image/png", png))
+                .header("Authorization", "Bearer " + token("ksr", "rahasia1")))
+            .andExpect(status().isForbidden());
+
+        call(delete("/api/products/" + id + "/image"), adminToken, null).andExpect(status().isOk())
+            .andExpect(jsonPath("$.imageUrl").value(org.hamcrest.Matchers.nullValue()));
+        mvc.perform(get("/api/products/" + id + "/image")).andExpect(status().isNotFound());
     }
 
     private long createProduct(String name, String sku, int price, int cost, int stock) throws Exception {

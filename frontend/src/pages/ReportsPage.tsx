@@ -32,7 +32,7 @@ export function ReportsPage() {
     ['30 hari', daysAgo(29), isoDate()],
     ['Bulan ini', firstOfMonth, isoDate()],
   ];
-  const margin = data && Number(data.totalRevenue) > 0 ? (Number(data.grossProfit) / Number(data.totalRevenue)) * 100 : 0;
+  const margin = data && Number(data.netRevenue) > 0 ? (Number(data.grossProfit) / Number(data.netRevenue)) * 100 : 0;
 
   return (
     <>
@@ -49,11 +49,12 @@ export function ReportsPage() {
       {loading && !data && <Spinner />}
       {data && (
         <div className="space-y-6">
-          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <Stat label="Omzet" value={money(data.totalRevenue)} sub={`${num(data.totalOrders)} transaksi · ${num(data.totalItems)} item`} />
             <Stat label="Laba Kotor" value={money(data.grossProfit)} sub={`Margin ${margin.toFixed(1)}% · HPP ${money(data.totalCost)}`} />
+            <Stat label="Pajak Terkumpul" value={money(data.totalTax)} sub={`Penjualan bersih (tanpa pajak) ${money(data.netRevenue)}`} />
             <Stat label="Rata-rata per Transaksi" value={money(data.averageOrder)} />
-            <Stat label="Diskon / Pajak" value={money(data.totalDiscount)} sub={`Pajak ${money(data.totalTax)} · ${data.voidedOrders} transaksi batal`} />
+            <Stat label="Diskon" value={money(data.totalDiscount)} sub={`${data.voidedOrders} transaksi batal`} />
           </section>
 
           <Card>

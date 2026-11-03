@@ -1,7 +1,14 @@
 package com.bee.pos.controller;
 
 import com.bee.pos.entity.Product;
+import com.bee.pos.service.ProductImageService;
 import com.bee.pos.service.ProductService;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
+import java.time.Duration;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -16,6 +23,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ProductController {
     private final ProductService products;
+    private final ProductImageService images;
 
     @GetMapping
     public List<Product> list(@RequestParam(required = false) String q,
@@ -45,6 +53,28 @@ public class ProductController {
     @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
     public Product update(@PathVariable Long id, @Valid @RequestBody Product product) {
         return products.update(id, product);
+    }
+
+    @PostMapping(value = "/{id}/image", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public Product uploadImage(@PathVariable Long id, @RequestParam("file") MultipartFile file) {
+        return images.upload(id, file);
+    }
+
+    @DeleteMapping("/{id}/image")
+    @PreAuthorize("hasAnyRole('ADMIN','MANAGER')")
+    public Product deleteImage(@PathVariable Long id) {
+        return images.delete(id);
+    }
+
+    /** Public so it works in plain &lt;img&gt; tags (which cannot send the Bearer token). */
+    @GetMapping("/{id}/image")
+    public ResponseEntity<Resource> image(@PathVariable Long id) {
+        ProductImageService.StoredImage img = images.load(id);
+        return ResponseEntity.ok()
+            .contentType(img.mediaType())
+            .cacheControl(CacheControl.maxAge(Duration.ofDays(30)).cachePublic())
+            .body(new FileSystemResource(img.path()));
     }
 
     @DeleteMapping("/{id}")

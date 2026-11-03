@@ -1,6 +1,6 @@
-import { FormEvent, useState } from 'react';
-import { Pencil, Plus, Search, Trash2 } from 'lucide-react';
-import { api } from '../services/api';
+import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
+import { ImageOff, ImagePlus, Package, Pencil, Plus, Search, Trash2 } from 'lucide-react';
+import { api, imageSrc } from '../services/api';
 import { useLoad } from '../lib/useLoad';
 import { errorMessage, money, num } from '../lib/format';
 import { Alert, Badge, Button, Field, Input, Modal, PageHeader, Select, Spinner, Table, Td, Textarea } from '../components/ui';
@@ -18,6 +18,28 @@ export function ProductsPage() {
   const [editing, setEditing] = useState<Product | 'new' | null>(null);
   const [deleting, setDeleting] = useState<Product | null>(null);
   const [busy, setBusy] = useState(false);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [removeImage, setRemoveImage] = useState(false);
+
+  // Reset the image picker whenever the modal opens for another product.
+  useEffect(() => { setImageFile(null); setRemoveImage(false); }, [editing]);
+  useEffect(() => {
+    if (!imageFile) { setImagePreview(null); return; }
+    const url = URL.createObjectURL(imageFile);
+    setImagePreview(url);
+    return () => URL.revokeObjectURL(url);
+  }, [imageFile]);
+
+  const pickImage = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) { toast.error('Format gambar harus JPG, PNG, atau WebP'); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error('Ukuran gambar maksimal 2 MB'); return; }
+    setImageFile(file);
+    setRemoveImage(false);
+  };
 
   const rows = (products.data ?? []).filter((p) =>
     (!category || p.category === category) && (!lowOnly || p.lowStock) &&
@@ -41,11 +63,20 @@ export function ProductsPage() {
       minStock: Number(f.get('minStock') || 0),
       description: text('description'),
       active: current ? f.get('active') === 'on' : true,
+      taxable: f.get('taxable') === 'on',
     };
     setBusy(true);
     try {
-      if (current) await api.updateProduct(current.id, payload);
-      else await api.createProduct(payload);
+      const saved = current ? await api.updateProduct(current.id, payload) : await api.createProduct(payload);
+      if (imageFile) {
+        try {
+          await api.uploadProductImage(saved.id, imageFile);
+        } catch (err) {
+          toast.error(`Produk tersimpan, tetapi gambar gagal diunggah: ${errorMessage(err)}`);
+        }
+      } else if (removeImage && current?.imageUrl) {
+        await api.deleteProductImage(saved.id);
+      }
       toast.success('Produk disimpan');
       setEditing(null);
       void products.reload();
@@ -97,8 +128,13 @@ export function ProductsPage() {
           {rows.map((p) => (
             <tr key={p.id} className={`hover:bg-slate-900/60 ${p.active === false ? 'opacity-50' : ''}`}>
               <Td>
-                <p className="font-medium text-white">{p.name} {p.active === false && <Badge>Nonaktif</Badge>}</p>
-                <p className="text-xs text-slate-500">{p.sku}{p.barcode ? ` · ${p.barcode}` : ''}</p>
+                <div className="flex items-center gap-3">
+                  <Thumb url={p.imageUrl} />
+                  <div className="min-w-0">
+                    <p className="font-medium text-white">{p.name} {p.active === false && <Badge>Nonaktif</Badge>}</p>
+                    <p className="text-xs text-slate-500">{p.sku}{p.barcode ? ` · ${p.barcode}` : ''}{p.taxable === false ? ' · bebas pajak' : ''}</p>
+                  </div>
+                </div>
               </Td>
               <Td>{p.category ?? '-'}</Td>
               <Td className="font-semibold">{money(p.price)}</Td>
@@ -119,6 +155,24 @@ export function ProductsPage() {
 
       <Modal open={editing !== null} wide title={current ? 'Ubah Produk' : 'Tambah Produk'} onClose={() => setEditing(null)}>
         <form key={current?.id ?? 'new'} onSubmit={submit} className="grid gap-3 sm:grid-cols-2">
+          <div className="flex items-center gap-4 sm:col-span-2">
+            <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-700 bg-slate-950">
+              {imagePreview || (!removeImage && current?.imageUrl)
+                ? <img src={imagePreview ?? imageSrc(current?.imageUrl) ?? undefined} alt="Gambar produk" className="h-full w-full object-cover" />
+                : <Package className="text-slate-600" size={32} />}
+            </div>
+            <div className="space-y-2">
+              <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-slate-100 hover:bg-slate-700">
+                <ImagePlus size={16} /> {current?.imageUrl || imageFile ? 'Ganti gambar' : 'Pilih gambar'}
+                <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={pickImage} />
+              </label>
+              {(imageFile || (current?.imageUrl && !removeImage)) && (
+                <button type="button" onClick={() => { setImageFile(null); setRemoveImage(true); }}
+                  className="ml-2 inline-flex items-center gap-1 text-xs text-rose-300 hover:text-rose-200"><ImageOff size={14} /> Hapus gambar</button>
+              )}
+              <p className="text-xs text-slate-500">JPG, PNG, atau WebP, maks. 2 MB. Disarankan rasio 4:3.</p>
+            </div>
+          </div>
           <Field label="Nama produk *" className="sm:col-span-2"><Input name="name" required defaultValue={current?.name} /></Field>
           <Field label="SKU *"><Input name="sku" required defaultValue={current?.sku} /></Field>
           <Field label="Barcode"><Input name="barcode" defaultValue={current?.barcode ?? ''} /></Field>
@@ -138,6 +192,10 @@ export function ProductsPage() {
             : <Field label="Stok awal"><Input name="stock" type="number" min={0} defaultValue={0} /></Field>}
           <Field label="Stok minimum" hint="Peringatan stok menipis muncul di bawah angka ini."><Input name="minStock" type="number" min={0} defaultValue={current?.minStock ?? 5} /></Field>
           <Field label="Deskripsi" className="sm:col-span-2"><Textarea name="description" rows={2} defaultValue={current?.description ?? ''} /></Field>
+          <label className="flex items-center gap-2 text-sm text-slate-300 sm:col-span-2">
+            <input type="checkbox" name="taxable" defaultChecked={current ? current.taxable !== false : true} className="accent-amber-400" /> Kena pajak toko
+            <span className="text-xs text-slate-500">(hilangkan centang untuk barang bebas pajak)</span>
+          </label>
           {current && (
             <label className="flex items-center gap-2 text-sm text-slate-300 sm:col-span-2">
               <input type="checkbox" name="active" defaultChecked={current.active !== false} className="accent-amber-400" /> Produk aktif (tampil di kasir)
@@ -160,5 +218,14 @@ export function ProductsPage() {
         </p>
       </Modal>
     </>
+  );
+}
+
+function Thumb({ url }: { url?: string | null }) {
+  const src = imageSrc(url);
+  return (
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-slate-800">
+      {src ? <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" /> : <Package size={16} className="text-slate-600" />}
+    </div>
   );
 }

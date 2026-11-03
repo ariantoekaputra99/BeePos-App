@@ -15,6 +15,10 @@ spring:
     open-in-view: false
   flyway:
     enabled: false
+  servlet:
+    multipart:
+      max-file-size: 2MB
+      max-request-size: 3MB
   jackson:
     serialization:
       write-dates-as-timestamps: false
@@ -30,6 +34,10 @@ management:
         enabled: true
 
 app:
+  upload-dir: ${APP_UPLOAD_DIR:./uploads}
+  store:
+    name: ${APP_STORE_NAME:BeePos Store}
+    address: ${APP_STORE_ADDRESS:}
   timezone: ${APP_TIMEZONE:Asia/Jakarta}
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:4173,http://localhost:8081}

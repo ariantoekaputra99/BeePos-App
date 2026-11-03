@@ -11,3 +11,4 @@ spring:
 app:
   seed:
     demo-data: false
+  upload-dir: target/test-uploads
