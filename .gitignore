@@ -27,3 +27,4 @@
 
 # Docker
 /docker-data/
+/backend/uploads/

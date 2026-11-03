@@ -1,10 +1,13 @@
 import type {
-  Category, Customer, DashboardSummary, LoginResponse, Movement, Product, ProductInput, PurchaseOrder,
+  Category, Customer, StoreSettings, DashboardSummary, LoginResponse, Movement, Product, ProductInput, PurchaseOrder,
   PurchaseOrderRequest, Sale, SaleRequest, SalesReport, Supplier, User, UserInput,
 } from '../types/api';
 
 export const API_URL: string = import.meta.env.VITE_API_URL ?? 'http://localhost:8080/api';
 const SESSION_KEY = 'beepos_session';
+
+/** Absolute URL for an imageUrl returned by the API (or null). */
+export const imageSrc = (imageUrl?: string | null) => (imageUrl ? `${API_URL}${imageUrl}` : null);
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) {
@@ -31,7 +34,8 @@ export const sessionStore = {
 
 async function raw(path: string, options: RequestInit = {}): Promise<Response> {
   const headers = new Headers(options.headers);
-  if (options.body) headers.set('Content-Type', 'application/json');
+  // FormData sets its own multipart boundary header.
+  if (options.body && !(options.body instanceof FormData)) headers.set('Content-Type', 'application/json');
   const token = sessionStore.get()?.token;
   if (token) headers.set('Authorization', `Bearer ${token}`);
 
@@ -86,6 +90,15 @@ export const api = {
   createProduct: (p: ProductInput) => send<Product>('POST', '/products', p),
   updateProduct: (id: number, p: ProductInput) => send<Product>('PUT', `/products/${id}`, p),
   deleteProduct: (id: number) => send<void>('DELETE', `/products/${id}`),
+  uploadProductImage: (id: number, file: File) => {
+    const form = new FormData();
+    form.append('file', file);
+    return request<Product>(`/products/${id}/image`, { method: 'POST', body: form });
+  },
+  deleteProductImage: (id: number) => send<Product>('DELETE', `/products/${id}/image`),
+
+  settings: () => request<StoreSettings>('/settings'),
+  updateSettings: (s: Omit<StoreSettings, 'updatedAt' | 'updatedBy'>) => send<StoreSettings>('PUT', '/settings', s),
 
   categories: () => request<Category[]>('/categories'),
   createCategory: (c: Omit<Category, 'id'>) => send<Category>('POST', '/categories', c),

@@ -30,8 +30,9 @@ public final class ReportDtos {
                                    List<LowStockProduct> lowStock,
                                    List<SaleDtos.SaleResponse> recentSales) {}
 
+    /** totalRevenue includes tax; netRevenue = totalRevenue - totalTax; grossProfit = netRevenue - totalCost. */
     public record SalesReport(LocalDate from, LocalDate to,
-                              BigDecimal totalRevenue, BigDecimal totalCost, BigDecimal grossProfit,
+                              BigDecimal totalRevenue, BigDecimal netRevenue, BigDecimal totalCost, BigDecimal grossProfit,
                               BigDecimal totalDiscount, BigDecimal totalTax, BigDecimal averageOrder,
                               long totalOrders, long totalItems, long voidedOrders,
                               List<DailySales> daily, List<PaymentBreakdown> byPaymentMethod,

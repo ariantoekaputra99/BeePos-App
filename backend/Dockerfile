@@ -12,7 +12,9 @@ RUN ./mvnw -B -q package -DskipTests
 FROM eclipse-temurin:21-jre
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/* \
-    && useradd --system --uid 10001 beepos
+    && useradd --system --uid 10001 beepos \
+    && mkdir -p /data/uploads && chown beepos /data/uploads
+ENV APP_UPLOAD_DIR=/data/uploads
 COPY --from=build /app/target/bee-pos-backend-0.0.1-SNAPSHOT.jar app.jar
 USER beepos
 EXPOSE 8080

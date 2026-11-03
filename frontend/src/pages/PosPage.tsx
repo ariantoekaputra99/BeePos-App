@@ -1,6 +1,8 @@
 import { FormEvent, useMemo, useRef, useState } from 'react';
-import { Minus, Plus, ScanBarcode, Search, Trash2, UserPlus } from 'lucide-react';
-import { api } from '../services/api';
+import { Minus, Package, Plus, ScanBarcode, Search, Trash2, UserPlus } from 'lucide-react';
+import { api, imageSrc } from '../services/api';
+import { useStoreSettings } from '../lib/useStoreSettings';
+import { calculateTax, taxLabel } from '../lib/tax';
 import { useLoad } from '../lib/useLoad';
 import { errorMessage, money, paymentLabel } from '../lib/format';
 import { Alert, Badge, Button, Field, Input, Modal, Select, Spinner } from '../components/ui';
@@ -13,13 +15,13 @@ const METHODS: PaymentMethod[] = ['CASH', 'QRIS', 'CARD', 'TRANSFER'];
 
 export function PosPage(_: { session: Session }) {
   const toast = useToast();
+  const store = useStoreSettings();
   const products = useLoad(() => api.products());
   const customers = useLoad(() => api.customers());
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('');
   const [cart, setCart] = useState<CartLine[]>([]);
   const [discount, setDiscount] = useState(0);
-  const [taxPercent, setTaxPercent] = useState(0);
   const [method, setMethod] = useState<PaymentMethod>('CASH');
   const [cash, setCash] = useState<number | ''>('');
   const [customerId, setCustomerId] = useState<number | ''>('');
@@ -32,14 +34,17 @@ export function PosPage(_: { session: Session }) {
 
   const list = products.data ?? [];
   const categories = useMemo(() => [...new Set(list.map((p) => p.category).filter(Boolean))] as string[], [list]);
+  // Only reserve image space when the catalogue actually uses images, so image-less shops stay compact.
+  const showImages = list.some((p) => p.imageUrl);
   const filtered = list.filter((p) =>
     (!category || p.category === category) &&
     `${p.name} ${p.sku} ${p.barcode ?? ''}`.toLowerCase().includes(query.toLowerCase()));
 
-  const subtotal = cart.reduce((sum, l) => sum + Number(l.product.price) * l.quantity, 0);
-  const safeDiscount = Math.min(Math.max(discount, 0), subtotal);
-  const tax = Math.round(((subtotal - safeDiscount) * taxPercent) / 100);
-  const total = subtotal - safeDiscount + tax;
+  const calc = calculateTax(
+    cart.map((l) => ({ amount: Number(l.product.price) * l.quantity, taxable: l.product.taxable !== false })),
+    discount, store);
+  const { subtotal, tax, total } = calc;
+  const safeDiscount = calc.discount;
   const paid = method === 'CASH' ? (cash === '' ? 0 : cash) : total;
   const change = paid - total;
   const canPay = cart.length > 0 && !busy && (method !== 'CASH' || paid >= total);
@@ -89,7 +94,6 @@ export function PosPage(_: { session: Session }) {
       const sale = await api.createSale({
         items: cart.map((l) => ({ productId: l.product.id, quantity: l.quantity })),
         paymentMethod: method,
-        tax,
         discount: safeDiscount,
         amountPaid: method === 'CASH' ? paid : total,
         customerId: customerId === '' ? null : customerId,
@@ -138,12 +142,18 @@ export function PosPage(_: { session: Session }) {
               const inCart = cart.find((l) => l.product.id === p.id)?.quantity ?? 0;
               return (
                 <button key={p.id} disabled={p.stock < 1} onClick={() => add(p)}
-                  className="relative rounded-2xl border border-slate-800 bg-slate-900 p-4 text-left transition hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-40">
-                  {inCart > 0 && <span className="absolute right-2 top-2 flex h-6 min-w-6 items-center justify-center rounded-full bg-amber-400 px-1.5 text-xs font-bold text-slate-950">{inCart}</span>}
-                  <Badge>{p.category || 'Umum'}</Badge>
+                  className="relative flex flex-col rounded-2xl border border-slate-800 bg-slate-900 p-4 text-left transition hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-40">
+                  {inCart > 0 && <span className="absolute right-2 top-2 z-10 flex h-6 min-w-6 items-center justify-center rounded-full bg-amber-400 px-1.5 text-xs font-bold text-slate-950">{inCart}</span>}
+                  {showImages && (p.imageUrl
+                    ? <img src={imageSrc(p.imageUrl) ?? undefined} alt="" loading="lazy"
+                        className="-mx-4 -mt-4 mb-3 aspect-[4/3] w-[calc(100%+2rem)] max-w-none rounded-t-2xl object-cover" />
+                    : <div className="-mx-4 -mt-4 mb-3 flex aspect-[4/3] w-[calc(100%+2rem)] items-center justify-center rounded-t-2xl bg-slate-800/60">
+                        <Package size={28} className="text-slate-600" />
+                      </div>)}
+                  <span className="self-start"><Badge>{p.category || 'Umum'}</Badge></span>
                   <h3 className="mt-3 line-clamp-2 text-sm font-semibold text-white">{p.name}</h3>
                   <p className="mt-0.5 text-xs text-slate-500">{p.sku}</p>
-                  <div className="mt-3 flex items-end justify-between gap-1">
+                  <div className="mt-auto flex items-end justify-between gap-1 pt-3">
                     <span className="font-bold text-amber-300">{money(p.price)}</span>
                     <span className={`text-xs ${p.lowStock ? 'text-amber-300' : 'text-slate-400'}`}>{p.stock} {p.unit ?? ''}</span>
                   </div>
@@ -193,9 +203,8 @@ export function PosPage(_: { session: Session }) {
           ))}
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="mt-4">
           <Field label="Diskon (Rp)"><Input type="number" min={0} value={discount || ''} onChange={(e) => setDiscount(Number(e.target.value) || 0)} placeholder="0" /></Field>
-          <Field label="Pajak (%)"><Input type="number" min={0} max={100} value={taxPercent || ''} onChange={(e) => setTaxPercent(Number(e.target.value) || 0)} placeholder="0" /></Field>
         </div>
         <div className="mt-3 flex items-end gap-2">
           <Field label="Pelanggan (opsional)" className="flex-1">
@@ -210,8 +219,9 @@ export function PosPage(_: { session: Session }) {
         <div className="mt-4 space-y-1.5 border-t border-slate-800 pt-4 text-sm">
           <Line label="Subtotal" value={money(subtotal)} />
           {safeDiscount > 0 && <Line label="Diskon" value={`- ${money(safeDiscount)}`} />}
-          {tax > 0 && <Line label={`Pajak ${taxPercent}%`} value={money(tax)} />}
+          {tax > 0 && !store?.taxInclusive && <Line label={taxLabel(store?.taxName, store?.taxRate)} value={money(tax)} />}
           <div className="flex justify-between pt-1 text-xl font-bold"><span>Total</span><span className="text-amber-300">{money(total)}</span></div>
+          {tax > 0 && store?.taxInclusive && <p className="text-right text-xs text-slate-500">Termasuk {taxLabel(store.taxName, store.taxRate)} {money(tax)}</p>}
         </div>
 
         <div className="mt-4 grid grid-cols-4 gap-2">

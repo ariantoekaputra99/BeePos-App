@@ -59,6 +59,7 @@ public class ProductService {
             .unit(blankToNull(input.getUnit()))
             .category(blankToNull(input.getCategory()))
             .description(blankToNull(input.getDescription()))
+            .taxable(input.getTaxable() == null || input.getTaxable())
             .active(true)
             .build();
         product = products.save(product);
@@ -84,6 +85,7 @@ public class ProductService {
         existing.setCategory(blankToNull(input.getCategory()));
         existing.setDescription(blankToNull(input.getDescription()));
         if (input.getActive() != null) existing.setActive(input.getActive());
+        if (input.getTaxable() != null) existing.setTaxable(input.getTaxable());
         return products.save(existing);
     }
 

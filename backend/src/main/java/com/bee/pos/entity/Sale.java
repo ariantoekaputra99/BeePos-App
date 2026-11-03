@@ -33,6 +33,14 @@ public class Sale {
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal total;
 
+    /** Tax configuration snapshot at the time of sale (for receipts and audit). */
+    private String taxName;
+
+    @Column(precision = 5, scale = 2)
+    private BigDecimal taxRate;
+
+    private Boolean taxInclusive;
+
     @Column(precision = 19, scale = 2)
     private BigDecimal amountPaid;
 

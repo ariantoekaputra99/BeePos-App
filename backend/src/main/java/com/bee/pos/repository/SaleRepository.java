@@ -17,6 +17,9 @@ public interface SaleRepository extends JpaRepository<Sale, Long> {
     @Query("select coalesce(sum(s.total), 0) from Sale s where s.status = com.bee.pos.entity.SaleStatus.COMPLETED or s.status is null")
     BigDecimal totalRevenue();
 
+    @Query("select coalesce(sum(s.tax), 0) from Sale s where s.status = com.bee.pos.entity.SaleStatus.COMPLETED or s.status is null")
+    BigDecimal totalTax();
+
     @Query("select count(s) from Sale s where s.status = com.bee.pos.entity.SaleStatus.COMPLETED or s.status is null")
     long countCompleted();
 

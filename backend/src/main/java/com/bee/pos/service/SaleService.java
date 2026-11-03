@@ -33,6 +33,7 @@ public class SaleService {
     private final CustomerRepository customers;
     private final UserRepository users;
     private final InventoryService inventory;
+    private final SettingsService settings;
     private final ZoneId businessZone;
 
     @Transactional
@@ -47,7 +48,6 @@ public class SaleService {
             .paymentMethod(request.paymentMethod())
             .status(SaleStatus.COMPLETED)
             .createdAt(now)
-            .tax(money(request.tax()))
             .discount(money(request.discount()))
             .note(request.note() == null || request.note().isBlank() ? null : request.note().trim())
             .cashier(users.findByUsername(CurrentUser.username()).orElse(null))
@@ -79,12 +79,25 @@ public class SaleService {
         if (sale.getDiscount().compareTo(subtotal) > 0) {
             throw new BusinessException("Diskon tidak boleh melebihi subtotal");
         }
-        BigDecimal total = subtotal.add(sale.getTax()).subtract(sale.getDiscount());
+
+        StoreSetting store = settings.current();
+        TaxCalculator.Result calc = TaxCalculator.calculate(
+            sale.getItems().stream()
+                .map(i -> new TaxCalculator.Line(i.getLineTotal(), !Boolean.FALSE.equals(i.getProduct().getTaxable())))
+                .toList(),
+            sale.getDiscount(), store.isTaxEnabled(), store.getTaxRate(), store.isTaxInclusive());
+        sale.setTax(calc.tax());
+        if (store.isTaxEnabled()) {
+            sale.setTaxName(store.getTaxName());
+            sale.setTaxRate(store.getTaxRate());
+            sale.setTaxInclusive(store.isTaxInclusive());
+        }
+        BigDecimal total = calc.total();
         BigDecimal paid = request.amountPaid() == null ? total : money(request.amountPaid());
         if (paid.compareTo(total) < 0) {
             throw new BusinessException("Uang yang dibayar kurang dari total belanja");
         }
-        sale.setSubtotal(subtotal);
+        sale.setSubtotal(calc.subtotal());
         sale.setTotal(total);
         sale.setAmountPaid(paid);
         sale.setChangeAmount(paid.subtract(total));

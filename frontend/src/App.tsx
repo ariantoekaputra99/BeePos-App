@@ -16,6 +16,8 @@ import { SuppliersPage } from './pages/SuppliersPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { UsersPage } from './pages/UsersPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { StoreSettingsPage } from './pages/StoreSettingsPage';
+import { clearStoreSettingsCache } from './lib/useStoreSettings';
 import { useToast } from './components/Toast';
 
 const readRoute = (): RouteKey => {
@@ -30,6 +32,7 @@ export default function App() {
 
   const logout = useCallback(() => {
     sessionStore.clear();
+    clearStoreSettingsCache();
     setSession(null);
   }, []);
 
@@ -70,6 +73,7 @@ export default function App() {
     suppliers: <SuppliersPage />,
     reports: <ReportsPage />,
     users: <UsersPage session={session} />,
+    store: <StoreSettingsPage />,
     settings: <SettingsPage session={session} />,
   }[active];
 

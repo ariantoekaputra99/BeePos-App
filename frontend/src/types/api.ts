@@ -44,10 +44,26 @@ export type Product = {
   category?: string | null;
   description?: string | null;
   active?: boolean | null;
+  taxable?: boolean | null;
+  /** Relative to API_URL, e.g. /products/3/image?v=ab12; null when the product has no image. */
+  imageUrl?: string | null;
   lowStock?: boolean;
 };
 
-export type ProductInput = Omit<Product, 'id' | 'lowStock'>;
+export type ProductInput = Omit<Product, 'id' | 'lowStock' | 'imageUrl'>;
+
+export type StoreSettings = {
+  storeName: string;
+  address?: string | null;
+  phone?: string | null;
+  receiptFooter?: string | null;
+  taxEnabled: boolean;
+  taxName: string;
+  taxRate: number;
+  taxInclusive: boolean;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+};
 
 export type Category = { id: number; name: string; description?: string | null };
 
@@ -79,6 +95,9 @@ export type Sale = {
   paymentMethod: PaymentMethod;
   subtotal: number;
   tax: number;
+  taxName?: string | null;
+  taxRate?: number | null;
+  taxInclusive?: boolean | null;
   discount: number;
   total: number;
   amountPaid?: number | null;
@@ -96,7 +115,6 @@ export type Sale = {
 export type SaleRequest = {
   items: Array<{ productId: number; quantity: number }>;
   paymentMethod: PaymentMethod;
-  tax: number;
   discount: number;
   amountPaid?: number;
   customerId?: number | null;
@@ -163,6 +181,7 @@ export type SalesReport = {
   from: string;
   to: string;
   totalRevenue: number;
+  netRevenue: number;
   totalCost: number;
   grossProfit: number;
   totalDiscount: number;

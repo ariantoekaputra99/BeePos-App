@@ -38,12 +38,14 @@ public class ReportService {
 
         BigDecimal revenue = sales.totalRevenue();
         BigDecimal cost = sales.totalCost();
+        // Collected tax belongs to the government, so it is excluded from gross profit.
+        BigDecimal netRevenue = revenue.subtract(sales.totalTax());
         var lowStock = products.findLowStock();
 
         return new DashboardSummary(
             products.countActive(),
             lowStock.size(),
-            revenue, cost, revenue.subtract(cost),
+            revenue, cost, netRevenue.subtract(cost),
             sales.countCompleted(),
             purchaseOrders.totalReceivedValue(),
             sum(todays), todays.size(), profit(todays),
@@ -64,6 +66,8 @@ public class ReportService {
         List<Sale> done = completed(all);
 
         BigDecimal revenue = sum(done);
+        BigDecimal tax = done.stream().map(Sale::getTax).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal netRevenue = revenue.subtract(tax);
         BigDecimal cost = done.stream().map(ReportService::cost).reduce(BigDecimal.ZERO, BigDecimal::add);
         long items = done.stream().flatMap(s -> s.getItems().stream()).mapToLong(SaleItem::getQuantity).sum();
         BigDecimal average = done.isEmpty() ? BigDecimal.ZERO
@@ -75,9 +79,9 @@ public class ReportService {
             .map(e -> new PaymentBreakdown(e.getKey(), sum(e.getValue()), e.getValue().size()))
             .toList();
 
-        return new SalesReport(begin, end, revenue, cost, revenue.subtract(cost),
+        return new SalesReport(begin, end, revenue, netRevenue, cost, netRevenue.subtract(cost),
             done.stream().map(Sale::getDiscount).reduce(BigDecimal.ZERO, BigDecimal::add),
-            done.stream().map(Sale::getTax).reduce(BigDecimal.ZERO, BigDecimal::add),
+            tax,
             average, done.size(), items, all.size() - done.size(),
             daily(done, begin, end), payments, topProducts(done, 10),
             all.stream().map(SaleResponse::from).toList());
@@ -141,7 +145,7 @@ public class ReportService {
     }
 
     private static BigDecimal profit(List<Sale> list) {
-        return list.stream().map(s -> s.getTotal().subtract(cost(s))).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return list.stream().map(s -> s.getTotal().subtract(s.getTax()).subtract(cost(s))).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     private static BigDecimal cost(Sale s) {
